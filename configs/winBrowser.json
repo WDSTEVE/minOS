@@ -1,0 +1,8 @@
+{
+    "display": {
+        "width": 256,
+        "height": 144,
+        "driver": "winBrowserDriver"
+    },
+    "linuxTmpDir" : false
+}
