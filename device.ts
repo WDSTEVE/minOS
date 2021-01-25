@@ -48,11 +48,8 @@ function updateState() {
     }
 }
 
-export function bindUpdate(func: () => void) {
-    updateFunc = func;
-}
 
-export function getDisplay() {
+function getDisplay() {
     return new Promise<Layer>((resolve, reject) => {
         if (display != null) {
             resolve(display);
@@ -84,4 +81,8 @@ export function setup(s: unknown) {
             resolve();
         }, (reason) => reject(reason));
     })
+}
+
+export function bindUpdate(func: () => void) {
+    updateFunc = func;
 }
