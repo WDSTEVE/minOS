@@ -1,12 +1,12 @@
 import { assert, baceURL } from "./general.ts";
 import { ensureDir } from "https://deno.land/std/fs/mod.ts";
-import { Process, ProcessState } from "./procces.ts";
+import { Process, ProcessPerms, ProcessState } from "./procces.ts";
 
 // load config
 
 let configSelector;
 try {
-    configSelector = Deno.readTextFileSync("./config.txt");
+    configSelector = Deno.readTextFileSync("./config.txt") || pickConfigSelector();
 } catch (e) {
     configSelector = pickConfigSelector();
 }
@@ -30,6 +30,18 @@ console.log(`initializing general system`)
 const processes: Process[] = [];
 let drawingProcess: Process | null = null;
 
+const elitePerms: ProcessPerms = {
+    fileAccess: 2,
+    denoAccess: true,
+    fineTime: true
+};
+
+const normalPerms: ProcessPerms = {
+    fileAccess: 1,
+    denoAccess: true,
+    fineTime: false
+};
+
 function handleProcessMessage(
     process: Process,
     cmd: string,
@@ -46,7 +58,9 @@ function handleProcessMessage(
                     width: config.display.width,
                     height: config.display.height,
                     owned: Object.is(drawingProcess, process)
-                }
+                },
+                diskName: process.diskName,
+                fileName: process.fileName
             };
             process.message("setState", [state]);
         } break;
@@ -87,9 +101,7 @@ function pickConfigSelector() {
     }
 }
 
-drawingProcess = new Process(baceURL("./disks/os/init.ts"), {
-    fileAccess: 2,
-}, handleProcessMessage);
+drawingProcess = new Process("os", "init.ts", elitePerms, handleProcessMessage);
 processes.push(drawingProcess);
 setInterval(update, 50);
 

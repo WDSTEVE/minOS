@@ -1,6 +1,9 @@
+import { loadBMP } from "./bmp.ts"
 import { assert } from "./general.ts";
-import { Layer } from "./image.ts";
+import { Layer } from "./draw.ts";
 import { ProcessState } from "./procces.ts";
+
+const pathParts = import.meta.url.split("/");
 
 let updateFunc = () => { };
 let processState: ProcessState | null = null;
@@ -85,4 +88,10 @@ export function setup(s: unknown) {
 
 export function bindUpdate(func: () => void) {
     updateFunc = func;
+}
+
+export function loadImage(fileName: string, diskName = processState?.diskName) {
+    if (diskName === undefined)
+        return Promise.reject("processState not set, run setup");
+    return loadBMP(`./disks/${diskName}/${fileName}.bmp`);
 }

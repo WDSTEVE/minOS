@@ -1,23 +1,36 @@
+type colorFormat = [number] | [number, number, number] | [string];
+
 export class Image {
     readonly width: number;
     readonly height: number;
+    readonly bottom: number;
     data: Uint8Array[];
     constructor(width: number, height: number) {
         this.width = width;
         this.height = height;
+        this.bottom = this.height - 1;
         this.data = Array.from(Array(this.height), () => new Uint8Array(3 * this.width));
     }
-    serialize(headerSize = 0) {
+    serialize(headerSize = 0, reverse = false) {
         const serialData = new Uint8Array(3 * this.width * this.height + headerSize);
+        const transform = reverse ?
+            (i: number) => this.bottom - i :
+            (i: number) => i;
         for (let i = 0; i < this.height; i++) {
-            serialData.set(this.data[i], i * this.width * 3 + headerSize);
+            serialData.set(this.data[i], transform(i) * this.width * 3 + headerSize);
         }
         return serialData;
     }
-    toArray() {
+    toArray(reverse = false) {
         const arr = [];
-        for (let i = 0; i < this.height; i++) {
-            arr.push(...this.data[i]);
+        if (reverse) {
+            for (let i = this.bottom; i >= 0; i--) {
+                arr.push(...this.data[i]);
+            }
+        } else {
+            for (let i = 0; i < this.height; i++) {
+                arr.push(...this.data[i]);
+            }
         }
         return arr;
     }
@@ -26,8 +39,9 @@ export class Image {
 export class Layer extends Image {
     private messageSystem;
     updated = false;
-    private fillColor: Color = new Color(255);
-    private strokeColor: Color | null = null;
+    private stateStack: [Color, Color | null][] = [];
+    fill = new Color(255);
+    stroke: Color | null = null;
     constructor(width: number, height: number, messageSystem: (cmd: string, args?: unknown[]) => void) {
         super(width, height);
         this.messageSystem = messageSystem;
@@ -36,32 +50,56 @@ export class Layer extends Image {
         if (this.updated)
             return;
         this.updated = true;
-        this.messageSystem("display", [this.toArray(), this.width, this.height])
+        this.messageSystem("display", [this.toArray(true), this.width, this.height])
+    }
+    push() {
+        this.stateStack.push([this.fill, this.stroke]);
+    }
+    pop() {
+        const state = this.stateStack.pop();
+        if (state === undefined)
+            return;
+        [this.fill, this.stroke] = state;
     }
     pixel(color: Color, x: number, y: number) {
+        x = Math.floor(x);
+        y = Math.floor(y);
         if (x < 0 || x >= this.width || y < 0 || y >= this.height)
             return;
         this.updated = false;
-        this.data[y][x * 3 + 0] = color.r;
+        this.data[y][x * 3 + 2] = color.r;
         this.data[y][x * 3 + 1] = color.g;
-        this.data[y][x * 3 + 2] = color.b;
+        this.data[y][x * 3 + 0] = color.b;
+    }
+    line(x1: number, y1: number, x2: number, y2: number) {
+        const dx = Math.abs(x1 - x2);
+        const dy = Math.abs(y1 - y2);
     }
     rect(x: number, y: number, w: number, h: number) {
         for (let yOff = 0; yOff < h; yOff++) {
             if (yOff === 0 || yOff === h - 1) {
                 for (let xOff = 0; xOff < w; xOff++) { // stroke top / bottome
-                    this.pixel(this.stroke, x + xOff, y + yOff);
+                    this.pixel(this.getStroke(), x + xOff, y + yOff);
                 }
             } else {
-                this.pixel(this.stroke, x + 0, y + yOff); // stroke right
+                this.pixel(this.getStroke(), x + 0, y + yOff); // stroke right
                 for (let xOff = 1; xOff < w - 1; xOff++) {
                     this.pixel(this.fill, x + xOff, y + yOff);
                 }
-                this.pixel(this.stroke, x + w - 1, y + yOff); // stroke left
+                this.pixel(this.getStroke(), x + w - 1, y + yOff); // stroke left
             }
         }
     }
+    background(...args: colorFormat) {
+        this.push();
+        this.stroke = null;
+        this.fill = new Color(...args);
+        this.rect(0, 0, this.width, this.height);
+        this.pop();
+    }
     image(image: Image, x: number, y: number) { // uses the native Uint8Array.set method to draw lines fast, breaks when image goes off side of screen
+        x = Math.floor(x);
+        y = Math.floor(y);
         if (x < 0 || x + image.width > this.width) {
             this.slowImage(image, x, y);
             return;
@@ -87,28 +125,30 @@ export class Layer extends Image {
             }
         }
     }
-    get fill() { return this.fillColor; }
-    set fill(value) { this.fillColor = value; }
-    get stroke() {
-        if (this.strokeColor === null)
-            return this.fillColor;
+    getStroke() {
+        if (this.stroke === null)
+            return this.fill;
         else
-            return this.strokeColor;
+            return this.stroke;
     }
-    set stroke(value) { this.fillColor = value; }
 }
 
 const colors: { [key: string]: number[] } = {
+    "white": [255, 255, 255],
     "red": [255, 0, 0],
+    "yellow": [255, 255, 0],
     "green": [0, 255, 0],
-    "blue": [0, 0, 255]
+    "cyan": [0, 255, 255],
+    "blue": [0, 0, 255],
+    "purple": [255, 0, 255],
+    "black": [0, 0, 0]
 }
 
 export class Color {
     r: number;
     g: number;
     b: number;
-    constructor(...args: [number] | [number, number, number] | [string]) {
+    constructor(...args: colorFormat) {
         if (args.length === 1) {
             if (typeof args[0] === "number") { // value
                 this.r = args[0];

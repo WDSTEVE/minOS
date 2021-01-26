@@ -1,9 +1,11 @@
-import { assert } from "./general.ts";
+import { assert, baceURL } from "./general.ts";
 
 type ProcessMessageHandler = (process: Process, cmd: string, args: unknown[]) => void;
 
 export interface ProcessPerms {
     readonly fileAccess: 0 | 1 | 2;
+    readonly denoAccess: boolean;
+    readonly fineTime: boolean;
 }
 
 export interface ProcessState {
@@ -13,29 +15,36 @@ export interface ProcessState {
         height: number,
         owned: boolean
     }
+    diskName: string,
+    fileName: string
 }
 
 export class Process {
+    readonly diskName: string;
+    readonly fileName: string;
     readonly path: string;
     readonly worker: Worker;
     readonly perms: ProcessPerms;
-    messageHandler : ProcessMessageHandler;
+    messageHandler: ProcessMessageHandler;
     lastRespond = new Date().getTime();
     alive = true;
-    constructor(path: string, perms: ProcessPerms, messageHandler: ProcessMessageHandler) {
-        this.path = path;
-        this.worker = new Worker(path, {
+    constructor(disk: string, file: string, perms: ProcessPerms, messageHandler: ProcessMessageHandler) {
+        this.diskName = disk;
+        this.fileName = file;
+        this.path = baceURL(`./disks/${disk}/${file}`);
+        const rwPerms = [false, ["./disks/"], [""]]
+        this.worker = new Worker(this.path, {
             type: "module",
             deno: {
-                namespace: false,
+                namespace: perms.denoAccess,
                 permissions: {
                     env: false,
-                    hrtime: false,
+                    hrtime: perms.fineTime,
                     net: false,
                     plugin: false,
-                    read: false,
+                    read: rwPerms[perms.fileAccess],
                     run: false,
-                    write: false,
+                    write: rwPerms[perms.fileAccess]
                 },
             },
         });

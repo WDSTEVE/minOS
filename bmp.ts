@@ -1,4 +1,4 @@
-import { Image } from "./image.ts";
+import { Image } from "./draw.ts";
 
 export function serialToBMP(data: Uint8Array, width: number, height: number) {
     const fileData = new Uint8Array(3 * width * height + 54);
@@ -13,12 +13,13 @@ export function loadBMP(url: string | URL) {
             const file = new DataView(data.buffer);
             const width = file.getInt32(18, true);
             const height = file.getInt32(22, true);
+            const bottom = height - 1;
             const image = new Image(width, height);
             for (let i = 0; i < height; i++) {
-                image.data[i] = data.slice(54 + 3 * width * i, 54 + 3 * width * (i + 1));
+                image.data[bottom - i] = data.slice(54 + 3 * width * i, 54 + 3 * width * (i + 1));
             }
             resolve(image);
-        }, reject)
+        }, reject);
     });
 }
 
