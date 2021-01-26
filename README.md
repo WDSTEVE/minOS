@@ -1,6 +1,6 @@
 # MinOS
-MinOS is minimal fantasy OS build in and for Javascript
-It is as cross-platfrom (in theory)
+MinOS is minimal fantasy OS build for and in Javascript
+It is cross-platfrom (in theory)
 
 ### Display Drivers
 MinOS renders its display on the cpu and displays it with its own "drivers"
